@@ -32,6 +32,19 @@ async function initDB() {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
+        // Adicione isto dentro da função initDB, logo após a criação da tabela de usuários:
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS videos (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        title VARCHAR(255),
+        caption TEXT,
+        video_url TEXT,
+        status VARCHAR(50) DEFAULT 'pendente',
+        scheduled_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`);
         console.log('✅ Tabela de usuários pronta!');
     } catch (err) {
         console.error('❌ Erro ao criar tabelas:', err);
