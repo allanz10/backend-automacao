@@ -1,19 +1,28 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { Pool } = require('pg'); // Nova ferramenta do banco de dados
 require('dotenv').config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-// Diz ao servidor para exibir a sua Interface (os arquivos da pasta public)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Esqueleto das rotas que o seu Frontend vai usar
+// Configuração da conexão com o Banco de Dados
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+});
+
+// Teste para ver se a conexão deu certo
+pool.connect()
+    .then(() => console.log('✅ Banco de dados conectado com sucesso!'))
+    .catch(err => console.error('❌ Erro ao conectar no banco:', err));
+
+// Rotas da interface
 app.post('/api/auth/login', (req, res) => {
-    res.json({ mensagem: "Login simulado. O banco de dados será conectado em breve." });
+    res.json({ mensagem: "Login simulado. Banco de dados conectado!" });
 });
 
 app.get('/api/videos', (req, res) => {
@@ -28,7 +37,6 @@ app.get('/api/dashboard', (req, res) => {
     res.json({ stats: { total: 0 } });
 });
 
-// Define a porta que o Railway vai usar
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
