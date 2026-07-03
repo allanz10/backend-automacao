@@ -117,12 +117,11 @@ app.post('/api/accounts', async (req, res) => {
     try {
         // Agora, ajuste a query SQL para salvar esses campos no seu banco
         // Certifique-se que o banco tenha colunas para cada um desses campos
-        await pool.query(
-            `INSERT INTO social_accounts (access_token, username, label, posts_per_day, start_time, end_time, interval_mode) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [accessToken, label, label, postsPerDay, startTime, endTime, intervalMode] 
-            // Nota: usei 'label' no lugar do username temporariamente, ajuste conforme seu banco
-        );
+       // Substitua o INSERT anterior por este:
+await pool.query(
+    'INSERT INTO social_accounts (username, access_token) VALUES ($1, $2)',
+    [label, accessToken] // Salvamos o 'label' (nome da conta) no campo 'username'
+);
         
         res.json({ 
             success: true, 
