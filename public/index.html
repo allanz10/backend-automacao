@@ -664,15 +664,42 @@ function doLogout() {
 }
 
 function enterApp() {
-  document.getElementById('authScreen').classList.add('hidden');
-  document.getElementById('appWrap').classList.add('show');
-  document.getElementById('sbUserAvatar').textContent = (currentUser.name || 'U')[0].toUpperCase();
-  document.getElementById('sbUserName').textContent = currentUser.name;
-  document.getElementById('sbUserRole').textContent = currentUser.role === 'admin' ? '🔒 Administrador' : 'Usuário';
-  document.getElementById('adminNav').style.display = currentUser.role === 'admin' ? 'block' : 'none';
-  document.getElementById('n-settings').style.display = currentUser.role === 'admin' ? 'flex' : 'none';
-  appInit();
+  const authScreen = document.getElementById('authScreen');
+  const appWrap = document.getElementById('appWrap');
+
+  if (authScreen) {
+    authScreen.classList.add('hidden');
+    authScreen.style.removeProperty('display');
+    authScreen.style.display = 'none';
+  }
+
+  if (appWrap) {
+    appWrap.classList.add('show');
+    appWrap.style.removeProperty('display');
+    appWrap.style.display = 'flex';
+  }
+
+  const name = currentUser?.name || 'Usuário';
+  const role = currentUser?.role || 'user';
+
+  const avatar = document.getElementById('sbUserAvatar');
+  const userName = document.getElementById('sbUserName');
+  const userRole = document.getElementById('sbUserRole');
+  const adminNav = document.getElementById('adminNav');
+  const settingsNav = document.getElementById('n-settings');
+
+  if (avatar) avatar.textContent = name[0].toUpperCase();
+  if (userName) userName.textContent = name;
+  if (userRole) userRole.textContent = role === 'admin' ? '🔒 Administrador' : 'Usuário';
+  if (adminNav) adminNav.style.display = role === 'admin' ? 'block' : 'none';
+  if (settingsNav) settingsNav.style.display = role === 'admin' ? 'flex' : 'none';
+
+  appInit().catch(err => {
+    console.error('Erro ao carregar painel:', err);
+    toast('Erro ao carregar o painel. Abra o console.', 'er');
+  });
 }
+
 
 // Enter on password fields
 document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
