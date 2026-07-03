@@ -156,7 +156,25 @@ app.get('/api/auth/me', async (req, res) => {
 // Rotas placeholder para a interface não dar erro
 app.get('/api/videos', (req, res) => res.json({ videos: [], counts: { todos: 0 } }));
 // Rota real para listar as contas conectadas
-app.get('/api/accounts', (req, res) => res.json([]));
+// Rota blindada para listar as contas conectadas sem travar o site
+app.get('/api/accounts', async (req, res) => {
+    try {
+        // Tenta buscar as contas no banco de dados
+        const result = await pool.query(
+            'SELECT id, platform, instagram_id, username, created_at FROM social_accounts WHERE user_id = $1 ORDER BY created_at DESC',
+            [1]
+        );
+        
+        // Se deu tudo certo, envia os dados encontrados
+        return res.json(result.rows || []);
+    } catch (err) {
+        // Se o banco falhar ou a tabela não existir, avisa o log...
+        console.error("Aviso: Não foi possível ler a tabela social_accounts:", err.message);
+        
+        // ...mas devolve uma lista vazia para o site NÃO TRAVAR na tela cinza!
+        return res.json([]);
+    }
+});
 app.get('/api/dashboard', (req, res) => res.json({ stats: { total: 0 } }));
 app.get('/api/categories', (req, res) => res.json([]));
 app.get('/api/captions', (req, res) => res.json([]));
