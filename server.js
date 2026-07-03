@@ -105,7 +105,7 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 // Adicione esta rota ao seu server.js
-app.post('/api/add-account', authenticateToken, async (req, res) => {
+app.post('/api/add-account', async (req, res) => {
     const { username, token } = req.body; // Verifique se o nome do campo é 'token' ou 'access_token' conforme seu HTML
     const userId = req.user.id; 
 
