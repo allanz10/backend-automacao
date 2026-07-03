@@ -151,3 +151,17 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
+
+// Rota que inicia o Login com Instagram/Facebook
+app.get('/api/auth/facebook', (req, res) => {
+    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${process.env.REDIRECT_URI}&scope=instagram_basic,instagram_content_publish,pages_read_engagement`;
+    res.json({ url: authUrl });
+});
+
+// Rota de retorno que o Facebook vai chamar
+app.get('/api/auth/facebook/callback', async (req, res) => {
+    const { code } = req.query;
+    // Aqui o servidor usa o 'code' para trocar pelo Token de acesso
+    // e salva esse token no banco de dados para o usuário logado.
+    res.send("Conexão recebida! (Lógica de troca de token em desenvolvimento)");
+});
