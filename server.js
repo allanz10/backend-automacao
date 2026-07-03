@@ -106,26 +106,32 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 // Adicione esta rota ao seu server.js
+const axios = require('axios'); // Certifique-se de que esta linha está no topo
+
 app.post('/api/accounts', async (req, res) => {
-    const { accessToken, label } = req.body;
+    // Pegamos os dados do body conforme o seu frontend envia
+    const { accessToken, label, postsPerDay, startTime, endTime, intervalMode } = req.body;
 
     try {
-        console.log("Tentando salvar conta:", label);
+        // 1. Validação: Tenta buscar o username do Instagram usando o token
+        const response = await axios.get(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
+        const instagramUsername = response.data.username;
+
+        // 2. Salva no banco (usando o username real do Instagram)
+        // Se você tiver colunas como 'posts_per_day', adicione-as aqui também
+        await pool.query(
+            `INSERT INTO social_accounts (username, access_token, label) 
+             VALUES ($1, $2, $3) 
+             ON CONFLICT (username) DO UPDATE SET access_token = EXCLUDED.access_token`,
+            [instagramUsername, accessToken, label]
+        );
+
+        res.json({ success: true, account: { username: instagramUsername } });
         
-        // Usamos ON CONFLICT para não travar se a conta já existir
-        const query = `
-            INSERT INTO social_accounts (username, access_token) 
-            VALUES ($1, $2) 
-            ON CONFLICT (username) 
-            DO UPDATE SET access_token = EXCLUDED.access_token
-        `;
-        
-        await pool.query(query, [label, accessToken]);
-        
-        res.json({ success: true, account: { username: label } });
     } catch (err) {
-        console.error('Erro fatal no banco:', err);
-        res.status(500).json({ success: false, error: 'Erro ao salvar no banco' });
+        console.error('Erro na validação do token:', err.message);
+        // Retorna erro se o token for inválido
+        res.status(400).json({ success: false, error: 'Token inválido ou expirado!' });
     }
 });
 // Rota para Entrar (Login)
