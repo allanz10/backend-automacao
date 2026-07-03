@@ -113,7 +113,8 @@ app.post('/api/accounts', async (req, res) => {
 
     try {
         // 1. Validação: Tenta buscar o username do Instagram usando o token
-        const response = await axios.get(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
+     // Substitua o axios.get antigo por este:
+const response = await axios.get(`https://graph.facebook.com/v20.0/me?fields=id,name&access_token=${accessToken}`);
         const instagramUsername = response.data.username;
 
         // 2. Salva no banco (usando o username real do Instagram)
@@ -127,11 +128,16 @@ app.post('/api/accounts', async (req, res) => {
 
         res.json({ success: true, account: { username: instagramUsername } });
         
-    } catch (err) {
-        console.error('Erro na validação do token:', err.message);
-        // Retorna erro se o token for inválido
-        res.status(400).json({ success: false, error: 'Token inválido ou expirado!' });
+   } catch (err) {
+    // Isso vai imprimir o erro real no log do Railway (não apenas a mensagem)
+    if (err.response) {
+        console.error('Erro retornado pela API do Instagram:', err.response.data);
+    } else {
+        console.error('Erro de conexão:', err.message);
     }
+    
+    res.status(400).json({ success: false, error: 'Erro ao validar Token' });
+}
 });
 // Rota para Entrar (Login)
 app.post('/api/auth/login', async (req, res) => {
