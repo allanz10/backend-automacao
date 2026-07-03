@@ -119,12 +119,11 @@ const response = await axios.get(`https://graph.instagram.com/me?fields=id,usern
 
         // 2. Salva no banco (usando o username real do Instagram)
         // Se você tiver colunas como 'posts_per_day', adicione-as aqui também
-        await pool.query(
-            `INSERT INTO social_accounts (username, access_token, label) 
-             VALUES ($1, $2, $3) 
-             ON CONFLICT (username) DO UPDATE SET access_token = EXCLUDED.access_token`,
-            [instagramUsername, accessToken, label]
-        );
+       // Removemos o 'label' do INSERT e do array de valores
+await pool.query(
+    'INSERT INTO social_accounts (username, access_token) VALUES ($1, $2) ON CONFLICT (username) DO UPDATE SET access_token = $2',
+    [instagramUsername, accessToken] // Apenas username e token
+);
 
         res.json({ success: true, account: { username: instagramUsername } });
         
