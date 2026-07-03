@@ -110,7 +110,7 @@ app.post('/api/accounts', async (req, res) => {
 
     try {
         // Ajuste aqui se o seu banco usar user_id ou outras colunas
-        await db.query(
+        await pool.query(
             'INSERT INTO social_accounts (username, access_token) VALUES ($1, $2)',
             [username, access_token]
         );
