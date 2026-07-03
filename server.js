@@ -173,8 +173,64 @@ app.get('/api/auth/facebook', (req, res) => {
 
 // Rota de retorno que o Facebook vai chamar
 app.get('/api/auth/facebook/callback', async (req, res) => {
+    // O Facebook manda o código de autorização pela URL
     const { code } = req.query;
-    // Aqui o servidor usa o 'code' para trocar pelo Token de acesso
-    // e salva esse token no banco de dados para o usuário logado.
-    res.send("Conexão recebida! (Lógica de troca de token em desenvolvimento)");
+
+    if (!code) {
+        return res.send("Erro: Código de autorização não recebido da Meta.");
+    }
+
+    try {
+        // 1. Trocar o 'code' pelo Token de Acesso de Curta Duração
+        const tokenResponse = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${process.env.REDIRECT_URI}&client_secret=${process.env.FACEBOOK_APP_SECRET}&code=${code}`);
+        const tokenData = await tokenResponse.json();
+
+        if (tokenData.error) {
+            console.error("Erro no Token:", tokenData.error);
+            return res.send("Erro ao obter o token primário do Facebook.");
+        }
+
+        const shortLivedToken = tokenData.access_token;
+
+        // 2. Trocar por um Token de Longa Duração (Dura 60 dias)
+        const longTokenResponse = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.FACEBOOK_APP_ID}&client_secret=${process.env.FACEBOOK_APP_SECRET}&fb_exchange_token=${shortLivedToken}`);
+        const longTokenData = await longTokenResponse.json();
+        const accessToken = longTokenData.access_token || shortLivedToken;
+
+        // 3. Obter o ID do Perfil
+        const profileResponse = await fetch(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${accessToken}`);
+        const profileData = await profileResponse.json();
+
+        // Calcula a data de validade (60 dias a partir de hoje)
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 60);
+
+        // 4. Salvar ou Atualizar no Banco de Dados
+        // Nota: Em um sistema completo, pegaríamos o ID do usuário logado através de sessão ou token JWT enviado no parâmetro 'state'.
+        // Aqui usaremos o user_id = 1 (você, o administrador principal) como padrão para garantir que funcione de imediato.
+        const userId = 1; 
+
+        const existing = await pool.query('SELECT id FROM social_accounts WHERE instagram_id = $1', [profileData.id]);
+        
+        if (existing.rows.length > 0) {
+            // Se a conta já existir no banco, apenas atualiza o token e a validade
+            await pool.query(
+                'UPDATE social_accounts SET access_token = $1, expires_at = $2 WHERE instagram_id = $3', 
+                [accessToken, expiresAt, profileData.id]
+            );
+        } else {
+            // Se for uma conta nova, insere todos os dados
+            await pool.query(
+                'INSERT INTO social_accounts (user_id, platform, instagram_id, username, access_token, expires_at) VALUES ($1, $2, $3, $4, $5, $6)', 
+                [userId, 'instagram', profileData.id, profileData.name, accessToken, expiresAt]
+            );
+        }
+
+        // 5. Redirecionar de volta para o seu site no Railway
+        res.redirect('https://aspas7-production.up.railway.app');
+
+    } catch (err) {
+        console.error("Erro no Callback:", err);
+        res.send("Erro interno do servidor ao processar a conexão com o Instagram.");
+    }
 });
