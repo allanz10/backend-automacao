@@ -156,21 +156,7 @@ app.get('/api/auth/me', async (req, res) => {
 // Rotas placeholder para a interface não dar erro
 app.get('/api/videos', (req, res) => res.json({ videos: [], counts: { todos: 0 } }));
 // Rota real para listar as contas conectadas
-app.get('/api/accounts', async (req, res) => {
-    try {
-        // Procura todas as contas guardadas para o utilizador administrador (ID 1)
-        const result = await pool.query(
-            'SELECT id, platform, instagram_id, username, created_at FROM social_accounts WHERE user_id = $1 ORDER BY created_at DESC',
-            [1]
-        );
-        
-        // Devolve a lista de contas encontrada para a interface
-        res.json(result.rows);
-    } catch (err) {
-        console.error("Erro ao carregar contas:", err);
-        res.status(500).json({ success: false, error: 'Erro interno ao carregar contas' });
-    }
-});
+app.get('/api/accounts', (req, res) => res.json([]));
 app.get('/api/dashboard', (req, res) => res.json({ stats: { total: 0 } }));
 app.get('/api/categories', (req, res) => res.json([]));
 app.get('/api/captions', (req, res) => res.json([]));
