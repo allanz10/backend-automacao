@@ -114,7 +114,7 @@ app.post('/api/accounts', async (req, res) => {
     try {
         // 1. Validação: Tenta buscar o username do Instagram usando o token
      // Substitua o axios.get antigo por este:
-const response = await axios.get(`https://graph.facebook.com/v20.0/me?fields=id,name&access_token=${accessToken}`);
+const response = await axios.get(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
         const instagramUsername = response.data.username;
 
         // 2. Salva no banco (usando o username real do Instagram)
