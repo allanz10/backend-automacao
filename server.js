@@ -32,6 +32,19 @@ async function initDB() {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
+            // Adicione isto dentro da função initDB() no server.js
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS social_accounts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        platform VARCHAR(50) DEFAULT 'instagram',
+        instagram_id VARCHAR(100),
+        username VARCHAR(100),
+        access_token TEXT,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`);
         // Adicione isto dentro da função initDB, logo após a criação da tabela de usuários:
 await pool.query(`
     CREATE TABLE IF NOT EXISTS videos (
