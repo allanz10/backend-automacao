@@ -628,17 +628,39 @@ async function doSignup() {
 
 function doLogout() {
   if (authToken) fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken } }).catch(() => {});
-  authToken = ''; localStorage.removeItem('ct_token'); currentUser = null;
-  // Limpar todo estado da sessão
+  
+  // 1. Limpa rigorosamente os dados de segurança
+  authToken = ''; 
+  localStorage.removeItem('ct_token'); 
+  currentUser = null;
+  
+  // 2. Limpa todo estado da sessão
   accounts = [];
   categories = [];
   uploadQueue = [];
-  uploadAbortMap.clear();
-  document.getElementById('sbAccountList').innerHTML = '';
-  document.getElementById('sbQueue').style.display = 'none';
-  document.getElementById('queueList').innerHTML = '';
-  document.getElementById('authScreen').classList.remove('hidden');
-  document.getElementById('appWrap').classList.remove('show');
+  if (typeof uploadAbortMap !== 'undefined' && uploadAbortMap.clear) uploadAbortMap.clear();
+  
+  // 3. Força os elementos visuais a resetarem (Garante que tudo limpe no HTML)
+  if (document.getElementById('sbAccountList')) document.getElementById('sbAccountList').innerHTML = '';
+  if (document.getElementById('sbQueue')) document.getElementById('sbQueue').style.display = 'none';
+  if (document.getElementById('queueList')) document.getElementById('queueList').innerHTML = '';
+  
+  // 4. GARANTIA ANTI-TELA PRETA: Força a exibição visual direta via CSS
+  const authScreen = document.getElementById('authScreen');
+  const appWrap = document.getElementById('appWrap');
+  
+  if (authScreen) {
+    authScreen.classList.remove('hidden');
+    authScreen.style.setProperty('display', 'flex', 'important'); // Garante que ela apareça mesmo se outra classe travar
+  }
+  if (appWrap) {
+    appWrap.classList.remove('show');
+    appWrap.style.setProperty('display', 'none', 'important'); // Esconde o painel principal de vez
+  }
+
+  // 5. O PULO DO GATO: Se a sessão expirou no carregamento, um reload limpo resolve tudo de vez!
+  // Como o 'ct_token' já foi removido acima, o site vai carregar direto na tela de login oficial.
+  window.location.reload();
 }
 
 function enterApp() {
