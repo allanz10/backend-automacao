@@ -627,40 +627,48 @@ async function doSignup() {
 }
 
 function doLogout() {
-  if (authToken) fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + authToken } }).catch(() => {});
-  
-  // 1. Limpa rigorosamente os dados de segurança
-  authToken = ''; 
-  localStorage.removeItem('ct_token'); 
+  if (authToken) {
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + authToken }
+    }).catch(() => {});
+  }
+
+  authToken = '';
+  localStorage.removeItem('ct_token');
   currentUser = null;
-  
-  // 2. Limpa todo estado da sessão
+
   accounts = [];
   categories = [];
   uploadQueue = [];
-  if (typeof uploadAbortMap !== 'undefined' && uploadAbortMap.clear) uploadAbortMap.clear();
-  
-  // 3. Força os elementos visuais a resetarem (Garante que tudo limpe no HTML)
-  if (document.getElementById('sbAccountList')) document.getElementById('sbAccountList').innerHTML = '';
-  if (document.getElementById('sbQueue')) document.getElementById('sbQueue').style.display = 'none';
-  if (document.getElementById('queueList')) document.getElementById('queueList').innerHTML = '';
-  
-  // 4. GARANTIA ANTI-TELA PRETA: Força a exibição visual direta via CSS
-  const authScreen = document.getElementById('authScreen');
-  const appWrap = document.getElementById('appWrap');
-  
-  if (authScreen) {
-    authScreen.classList.remove('hidden');
-    authScreen.style.setProperty('display', 'flex', 'important'); // Garante que ela apareça mesmo se outra classe travar
-  }
-  if (appWrap) {
-    appWrap.classList.remove('show');
-    appWrap.style.setProperty('display', 'none', 'important'); // Esconde o painel principal de vez
+
+  if (typeof uploadAbortMap !== 'undefined' && uploadAbortMap.clear) {
+    uploadAbortMap.clear();
   }
 
-  // 5. O PULO DO GATO: Se a sessão expirou no carregamento, um reload limpo resolve tudo de vez!
-  // Como o 'ct_token' já foi removido acima, o site vai carregar direto na tela de login oficial.
-  window.location.reload();
+  const sbAccsList = document.getElementById('sbAccsList');
+  const sbQueue = document.getElementById('sbQueue');
+  const queueList = document.getElementById('queueList');
+  const authScreen = document.getElementById('authScreen');
+  const appWrap = document.getElementById('appWrap');
+
+  if (sbAccsList) sbAccsList.innerHTML = '';
+  if (sbQueue) sbQueue.style.display = 'none';
+  if (queueList) queueList.innerHTML = '';
+
+  if (appWrap) {
+    appWrap.classList.remove('show');
+    appWrap.style.removeProperty('display');
+    appWrap.style.display = 'none';
+  }
+
+  if (authScreen) {
+    authScreen.classList.remove('hidden');
+    authScreen.style.removeProperty('display');
+    authScreen.style.display = 'flex';
+  }
+
+  showLogin();
 }
 
 function enterApp() {
@@ -765,7 +773,7 @@ function renderQueue(){
     if(isDone||isErr||isCancelled){pct=100;}
     else if(q.totalBytes>0){pct=Math.min(99,Math.round(q.bytesLoaded/q.totalBytes*100));}
     else if(q.total>0){pct=Math.round(q.done/q.total*100);}
-    const fill=isErr?'var(--rd)':isCancelled?'var(--tx3)':isDone?(hasErrs?'var(--ye)':'var(--gr)'):'linear-gradient(90deg,var(--p),var(--p2))';
+    const fill=isErr?'var(--rd)':isCancelled?'var(--tx3)':isDone?(hasErrs?'var(--ye)':'var(--ac)'):'linear-gradient(90deg,var(--p),var(--p2))';
     const pctLabel=isDone?(hasErrs?'⚠ '+q.errs+' erro(s)':'✓'):isErr?'✗':isCancelled?'—':(pct+'%');
     // Linha de detalhe: arquivo atual + velocidade + arquivos concluídos
     let detailLine='';
@@ -869,37 +877,228 @@ function cancelUpload(qid){
 
 // Upload direto browser → R2 via presign (sem passar pelo servidor)
 // Mais rápido pois elimina 1 hop: browser → servidor → R2 vira browser → R2
-async function runUploadPresign(qid,files,params,acc){
-  const PARALLEL=6; // direto ao R2: gargalo é só banda upstream do cliente
-  let uploadDone=0,errs=0,cancelled=false;
-  const total=files.length;
-  const ctrl=new AbortController();
-  uploadAbortMap.set(qid,ctrl);
-  const batchId=params.batchName||('b_'+Date.now());
-  const fileArr=[...files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
-  const uploaded=[];
+async function runUploadPresign(qid, files, params, acc) {
+  const PARALLEL = 6;
+  let uploadDone = 0;
+  let errs = 0;
+  let cancelled = false;
 
-  // Calcular total de bytes para barra suave
-  const totalBytes=fileArr.reduce((s,f)=>s+f.size,0);
-  // bytesPerFile[idx] = bytes enviados desse arquivo até agora
-  const bytesPerFile=new Array(fileArr.length).fill(0);
-  // activeFiles = arquivos enviando agora [{name, pct}]
-  const activeMap=new Map();
+  const total = files.length;
+  const ctrl = new AbortController();
+  uploadAbortMap.set(qid, ctrl);
 
-  const q=uploadQueue.find(q=>q.id===qid);
-  if(q){q.totalBytes=totalBytes;q.bytesLoaded=0;q.activeFiles=[];}
-  updateQueue(qid,0,total,'Iniciando...','uploading');
+  const batchId = params.batchName || ('b_' + Date.now());
+  const fileArr = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  const uploaded = [];
 
-  function refreshProgress(){
-    const loaded=bytesPerFile.reduce((s,b)=>s+b,0);
-    const q=uploadQueue.find(q=>q.id===qid);
-    if(q){
-      q.bytesLoaded=loaded;
-      q.done=uploadDone;
-      q.activeFiles=[...activeMap.values()];
+  const totalBytes = fileArr.reduce((s, f) => s + f.size, 0);
+  const bytesPerFile = new Array(fileArr.length).fill(0);
+  const activeMap = new Map();
+
+  const q = uploadQueue.find(q => q.id === qid);
+  if (q) {
+    q.totalBytes = totalBytes;
+    q.bytesLoaded = 0;
+    q.activeFiles = [];
+  }
+
+  updateQueue(qid, 0, total, 'Iniciando...', 'uploading');
+
+  function refreshProgress() {
+    const loaded = bytesPerFile.reduce((s, b) => s + b, 0);
+    const q = uploadQueue.find(q => q.id === qid);
+
+    if (q) {
+      q.bytesLoaded = loaded;
+      q.done = uploadDone;
+      q.activeFiles = [...activeMap.values()];
       renderQueue();
     }
   }
+
+  async function uploadOne(f, idx, retried = false) {
+    if (cancelled || ctrl.signal.aborted) return null;
+
+    activeMap.set(idx, { name: f.name, pct: 0 });
+    refreshProgress();
+
+    try {
+      const ext = f.name.split('.').pop().toLowerCase();
+      const ct = 'video/' + ext;
+
+      const presign = await fetch(
+        `/api/videos/presign?filename=${encodeURIComponent(f.name)}&accountId=${params.accountId}&contentType=${encodeURIComponent(ct)}`,
+        {
+          headers: { 'Authorization': 'Bearer ' + authToken },
+          signal: ctrl.signal
+        }
+      ).then(r => r.json());
+
+      if (presign.error) throw new Error(presign.error);
+
+      await new Promise((res, rej) => {
+        if (ctrl.signal.aborted) return rej(new Error('cancelado'));
+
+        const xhr = new XMLHttpRequest();
+
+        const onAbort = () => {
+          xhr.abort();
+          rej(new Error('cancelado'));
+        };
+
+        ctrl.signal.addEventListener('abort', onAbort);
+
+        xhr.upload.onprogress = e => {
+          if (!e.lengthComputable) return;
+
+          bytesPerFile[idx] = e.loaded;
+          activeMap.set(idx, { name: f.name, pct: Math.round(e.loaded / e.total * 100) });
+          refreshProgress();
+        };
+
+        xhr.onload = () => {
+          ctrl.signal.removeEventListener('abort', onAbort);
+
+          if (xhr.status >= 400) {
+            console.error('[R2 Error]', xhr.status, xhr.responseText.slice(0, 300));
+            rej(new Error('R2 ' + xhr.status + (xhr.status === 403 ? ' (assinatura inválida - tente novamente)' : xhr.status === 400 ? ' (requisição inválida)' : '')));
+          } else {
+            res();
+          }
+        };
+
+        xhr.onerror = () => {
+          ctrl.signal.removeEventListener('abort', onAbort);
+          rej(new Error('Erro de rede'));
+        };
+
+        xhr.onabort = () => {
+          ctrl.signal.removeEventListener('abort', onAbort);
+          rej(new Error('cancelado'));
+        };
+
+        xhr.open('PUT', presign.uploadUrl);
+        xhr.setRequestHeader('Content-Type', presign.contentType || ct);
+        xhr.send(f);
+      });
+
+      bytesPerFile[idx] = f.size;
+      activeMap.delete(idx);
+      uploadDone++;
+      refreshProgress();
+
+      return {
+        idx,
+        originalName: f.name,
+        key: presign.key,
+        publicFileUrl: presign.publicFileUrl || presign.fileUrl,
+        bytes: f.size
+      };
+    } catch (e) {
+      if (e.message === 'cancelado') {
+        cancelled = true;
+        return null;
+      }
+
+      if (!e.message.startsWith('R2 403') && !retried) {
+        console.warn('[Upload] Retry:', f.name, e.message);
+        await new Promise(r => setTimeout(r, 1500));
+        return uploadOne(f, idx, true);
+      }
+
+      bytesPerFile[idx] = 0;
+      activeMap.delete(idx);
+      errs++;
+
+      const q = uploadQueue.find(q => q.id === qid);
+      if (q) q.errs = (q.errs || 0) + 1;
+
+      console.warn('[Upload] Falhou:', f.name, e.message);
+      refreshProgress();
+
+      return null;
+    }
+  }
+
+  const indexed = fileArr.map((f, idx) => ({ f, idx }));
+
+  for (let i = 0; i < indexed.length; i += PARALLEL) {
+    if (cancelled || ctrl.signal.aborted) break;
+
+    const batch = indexed.slice(i, i + PARALLEL);
+
+    const results = await Promise.all(batch.map(({ f, idx }) => {
+      if (cancelled || ctrl.signal.aborted) return Promise.resolve(null);
+      return uploadOne(f, idx);
+    }));
+
+    results.forEach(r => {
+      if (r) uploaded.push(r);
+    });
+
+    if (cancelled || ctrl.signal.aborted) break;
+  }
+
+  uploadAbortMap.delete(qid);
+
+  if (cancelled) return;
+
+  if (!uploaded.length) {
+    updateQueue(qid, 0, total, 'Nenhum arquivo enviado', 'error');
+    toast('❌ Falha no upload', 'er');
+    return;
+  }
+
+  uploaded.sort((a, b) => a.idx - b.idx);
+  updateQueue(qid, total, total, `Agendando ${uploaded.length} vídeo(s)...`, 'uploading');
+
+  try {
+    const r = await fetch('/api/videos/confirm-batch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + authToken
+      },
+      body: JSON.stringify({
+        accountId: params.accountId,
+        batchId,
+        cycles: parseInt(params.cycles) || 1,
+        caption: params.caption || '',
+        hashtags: params.hashtags || '',
+        videos: uploaded.map(u => ({
+          key: u.key,
+          publicFileUrl: u.publicFileUrl,
+          originalName: u.originalName,
+          bytes: u.bytes
+        }))
+      })
+    }).then(r => r.json());
+
+    if (r.error) throw new Error(r.error);
+
+    const scheduled = r.scheduled || uploaded.length;
+    const finalStatus = errs > 0 && scheduled === 0 ? 'error' : 'done';
+    const finalMsg = errs > 0 ? `${scheduled} agendados, ${errs} com erro` : `${scheduled} vídeo(s) agendados!`;
+
+    updateQueue(qid, total, total, finalMsg, finalStatus);
+
+    toast(
+      errs === 0
+        ? '✅ @' + (acc.username || acc.label) + ': ' + scheduled + ' agendados!'
+        : '⚠️ @' + (acc.username || acc.label) + ': ' + scheduled + ' ok, ' + errs + ' erros',
+      errs === 0 ? 'ok' : 'wa'
+    );
+  } catch (e) {
+    updateQueue(qid, total, total, 'Erro ao agendar: ' + e.message, 'error');
+    toast('⚠️ ' + e.message, 'er');
+  }
+
+  if (document.getElementById('panel-videos')?.classList.contains('act')) loadVideos();
+  if (document.getElementById('panel-dash')?.classList.contains('act')) loadDash();
+
+  setTimeout(() => removeFromQueue(qid), 60000);
+}
+
 
   async function uploadOne(f,idx,retried=false){
     if(cancelled||ctrl.signal.aborted)return null;
@@ -1055,7 +1254,7 @@ async function loadDash(){
     return `<div class="dash-acc-card">
       <div class="dash-acc-header"><div class="dash-acc-av">📷</div><div style="flex:1"><div class="dash-acc-name">@${a.username||a.label} ${getCatTag(a.categoryId)}</div><div class="dash-acc-sub">${a.postsPerDay}×/dia · ${a.startTime}–${a.endTime}</div></div><button class="icon-btn" title="Reagendar pendentes com intervalo correto" onclick="rescheduleAcc('${a.id}','${a.username||a.label}')">🔄</button></div>
       <div class="dash-acc-bars">
-        <div class="dash-bar-row"><span class="dash-bar-lbl">✅ Postados</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${pPost}%;background:var(--gr)"></div></div><span class="dash-bar-val c-g">${post}</span></div>
+        <div class="dash-bar-row"><span class="dash-bar-lbl">✅ Postados</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${pPost}%;background:var(--ac)"></div></div><span class="dash-bar-val c-g">${post}</span></div>
         <div class="dash-bar-row"><span class="dash-bar-lbl">⏰ Pendentes</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${pPend}%;background:var(--ye)"></div></div><span class="dash-bar-val c-y">${pend}</span></div>
         <div class="dash-bar-row"><span class="dash-bar-lbl">❌ Erros</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${pErr}%;background:var(--rd)"></div></div><span class="dash-bar-val c-r">${err}</span></div>
         <div class="dash-bar-row"><span class="dash-bar-lbl">📦 Total</span><div class="dash-bar-track"><div class="dash-bar-fill" style="width:${tot>0?100:0}%;background:var(--p)"></div></div><span class="dash-bar-val c-p">${tot}</span></div>
@@ -1106,13 +1305,13 @@ async function addAccount() {
             // Redireciona você automaticamente para a página de autorização da Meta
             window.location.href = data.url;
         } else {
-            showToast('Não foi possível iniciar a conexão com a Meta.', 'er');
+            toast('Não foi possível iniciar a conexão com a Meta.', 'er');
             btn.disabled = false;
             btn.innerHTML = originalText;
         }
     } catch (err) {
         console.error('Erro na conexão:', err);
-        showToast('Erro de rede ao ligar ao servidor.', 'er');
+        toast('Erro de rede ao ligar ao servidor.', 'er');
         btn.disabled = false;
         btn.innerHTML = originalText;
     }
@@ -1486,7 +1685,7 @@ function copyVideoUrl(url, btn) {
   navigator.clipboard.writeText(url).then(() => {
     const orig = btn.textContent;
     btn.textContent = '✓';
-    btn.style.color = 'var(--gr)';
+    btn.style.color = 'var(--ac)';
     toast('URL copiada!', 'ok');
     setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
   }).catch(() => {
@@ -1500,15 +1699,43 @@ function copyVideoUrl(url, btn) {
   });
 }
 
-async function appInit(){
-  // Resetar estado ao entrar — evita vazar dados de sessão anterior
-  accounts=[];categories=[];uploadQueue=[];
+async function appInit() {
+  accounts = [];
+  categories = [];
+  uploadQueue = [];
+
   updateSbAccounts();
   renderQueue();
-  const data=await api('/api/accounts');accounts=data;updateSbAccounts();
-  await loadCategories();
-  await loadCaptionPresets();
-  loadDash();
+
+  try {
+    const data = await api('/api/accounts');
+    accounts = Array.isArray(data) ? data : [];
+    updateSbAccounts();
+  } catch (err) {
+    console.error('Erro ao carregar contas:', err);
+    accounts = [];
+    updateSbAccounts();
+  }
+
+  try {
+    await loadCategories();
+  } catch (err) {
+    console.error('Erro ao carregar categorias:', err);
+    categories = [];
+  }
+
+  try {
+    await loadCaptionPresets();
+  } catch (err) {
+    console.error('Erro ao carregar legendas:', err);
+    captionPresets = [];
+  }
+
+  try {
+    await loadDash();
+  } catch (err) {
+    console.error('Erro ao carregar dashboard:', err);
+  }
 }
 setInterval(()=>{if(!currentUser)return;const a=document.querySelector('.panel.act')?.id;if(a==='panel-dash')loadDash();if(a==='panel-videos')loadVideos();},30000);
 </script>
