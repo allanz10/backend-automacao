@@ -106,24 +106,24 @@ app.post('/api/auth/signup', async (req, res) => {
 
 // Adicione esta rota ao seu server.js
 app.post('/api/add-account', async (req, res) => {
-    const { username, token } = req.body; // Verifique se o nome do campo é 'token' ou 'access_token' conforme seu HTML
-    const userId = req.user.id; 
+    // Usamos o 'body' para pegar o que o seu formulário no front está enviando
+    const { username, access_token } = req.body;
 
-    if (!username || !token) {
-        return res.status(400).json({ error: 'Usuário e Token são obrigatórios' });
-    }
+    console.log("Tentando salvar:", username, access_token); // Ajuda a ver no log se os dados chegaram
 
     try {
-        // Insere a conta no banco de dados
+        // Query para inserir no banco
+        // Certifique-se que 'user_id' existe. Se o seu sistema não usa login, 
+        // talvez precise remover o 'user_id' da query abaixo.
         await db.query(
-            'INSERT INTO social_accounts (user_id, username, access_token) VALUES ($1, $2, $3)',
-            [userId, username, token]
+            'INSERT INTO social_accounts (username, access_token) VALUES ($1, $2)',
+            [username, access_token]
         );
         
-        res.json({ success: true, message: 'Conta conectada com sucesso!' });
+        res.json({ success: true, message: 'Conta salva com sucesso!' });
     } catch (err) {
-        console.error('Erro ao salvar conta:', err);
-        res.status(500).json({ error: 'Erro interno ao salvar no banco' });
+        console.error('Erro ao salvar no banco:', err);
+        res.status(500).json({ error: 'Erro ao salvar no banco de dados' });
     }
 });
 
