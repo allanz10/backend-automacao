@@ -21,6 +21,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'chave-secreta-super-segura-123';
 // Cria a tabela de usuários automaticamente se ela não existir
 async function initDB() {
     try {
+        // Adicione isto dentro da função initDB() no server.js
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS social_accounts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        platform VARCHAR(50) DEFAULT 'instagram',
+        instagram_id VARCHAR(100),
+        username VARCHAR(100),
+        access_token TEXT,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
