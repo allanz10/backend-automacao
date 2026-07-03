@@ -1041,12 +1041,32 @@ function selMode(mode){currentMode=mode;document.getElementById('mode-intel').cl
 function updateIntervalPreview(){const ppd=parseInt(document.getElementById('aa-ppd').value)||40;const st=document.getElementById('aa-st').value||'02:00';const et=document.getElementById('aa-et').value||'23:00';const[sh,sm]=st.split(':').map(Number);const[eh,em]=et.split(':').map(Number);const w=(eh*60+em)-(sh*60+sm);const iv=ppd>1?Math.floor(w/(ppd-1)):w;document.getElementById('intervalPreview').textContent='Intervalo: '+iv+'min · '+ppd+' posts/dia';}
 updateIntervalPreview();
 
-async function addAccount(){
-  const token=document.getElementById('aa-token').value.trim();const label=document.getElementById('aa-label').value.trim();
-  if(!token){toast('Cole o Access Token','er');return;}const btn=document.getElementById('addAccBtn');btn.disabled=true;btn.innerHTML='<div class="spin"></div> Verificando...';
-  try{const r=await api('/api/accounts',{method:'POST',body:JSON.stringify({accessToken:token,label,postsPerDay:document.getElementById('aa-ppd').value,startTime:document.getElementById('aa-st').value,endTime:document.getElementById('aa-et').value,intervalMode:currentMode})});
-    if(r.success){toast('✅ @'+r.account.username+' adicionada!','ok');closeModal('modalAddAcc');document.getElementById('aa-token').value='';document.getElementById('aa-label').value='';loadAccounts();}else toast('Erro: '+r.error,'er');
-  }catch(e){toast('Erro: '+e.message,'er');}btn.disabled=false;btn.innerHTML='✅ Verificar e adicionar';
+async function addAccount() {
+    const btn = document.getElementById('addAccBtn');
+    const originalText = btn.innerHTML;
+    
+    try {
+        btn.disabled = true;
+        btn.innerHTML = `<div class="spin"></div> Aguarde...`;
+
+        // Chama a rota que criamos no seu servidor do Railway
+        const response = await fetch('/api/auth/facebook');
+        const data = await response.json();
+
+        if (data.url) {
+            // Redireciona você automaticamente para a página de autorização da Meta
+            window.location.href = data.url;
+        } else {
+            showToast('Não foi possível iniciar a conexão com a Meta.', 'er');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    } catch (err) {
+        console.error('Erro na conexão:', err);
+        showToast('Erro de rede ao ligar ao servidor.', 'er');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
 }
 async function testAccount(id){toast('Testando...','in');const r=await api('/api/accounts/'+id+'/test',{method:'POST'});if(r.success)toast('✓ @'+r.username+' ok','ok');else toast('Erro: '+r.error,'er');}
 async function delAccount(id){if(!confirm('Remover esta conta?'))return;await api('/api/accounts/'+id,{method:'DELETE'});toast('Removida','wa');loadAccounts();}
