@@ -106,33 +106,27 @@ app.post('/api/auth/signup', async (req, res) => {
 
 // Adicione esta rota ao seu server.js
 app.post('/api/accounts', async (req, res) => {
-    // Pegamos os campos exatamente como enviados pelo front
-    const { accessToken, label, postsPerDay, startTime, endTime, intervalMode } = req.body;
-
-    // Verificação básica
-    if (!accessToken) {
-        return res.status(400).json({ error: 'Token é obrigatório' });
-    }
+    const { accessToken, label } = req.body;
 
     try {
-        // Agora, ajuste a query SQL para salvar esses campos no seu banco
-        // Certifique-se que o banco tenha colunas para cada um desses campos
-       // Substitua o INSERT anterior por este:
-await pool.query(
-    'INSERT INTO social_accounts (username, access_token) VALUES ($1, $2)',
-    [label, accessToken] // Salvamos o 'label' (nome da conta) no campo 'username'
-);
+        console.log("Tentando salvar conta:", label);
         
-        res.json({ 
-            success: true, 
-            account: { username: label } // O front espera um objeto account.username
-        });
+        // Usamos ON CONFLICT para não travar se a conta já existir
+        const query = `
+            INSERT INTO social_accounts (username, access_token) 
+            VALUES ($1, $2) 
+            ON CONFLICT (username) 
+            DO UPDATE SET access_token = EXCLUDED.access_token
+        `;
+        
+        await pool.query(query, [label, accessToken]);
+        
+        res.json({ success: true, account: { username: label } });
     } catch (err) {
-        console.error('Erro ao salvar no banco:', err);
-        res.status(500).json({ error: 'Erro interno ao salvar' });
+        console.error('Erro fatal no banco:', err);
+        res.status(500).json({ success: false, error: 'Erro ao salvar no banco' });
     }
 });
-
 // Rota para Entrar (Login)
 app.post('/api/auth/login', async (req, res) => {
     try {
