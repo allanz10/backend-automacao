@@ -105,25 +105,20 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 // Adicione esta rota ao seu server.js
-app.post('/api/add-account', async (req, res) => {
-    // Usamos o 'body' para pegar o que o seu formulário no front está enviando
-    const { username, access_token } = req.body;
-
-    console.log("Tentando salvar:", username, access_token); // Ajuda a ver no log se os dados chegaram
+app.post('/api/accounts', async (req, res) => {
+    const { username, access_token } = req.body; 
 
     try {
-        // Query para inserir no banco
-        // Certifique-se que 'user_id' existe. Se o seu sistema não usa login, 
-        // talvez precise remover o 'user_id' da query abaixo.
+        // Ajuste aqui se o seu banco usar user_id ou outras colunas
         await db.query(
             'INSERT INTO social_accounts (username, access_token) VALUES ($1, $2)',
             [username, access_token]
         );
         
-        res.json({ success: true, message: 'Conta salva com sucesso!' });
+        res.json({ success: true });
     } catch (err) {
-        console.error('Erro ao salvar no banco:', err);
-        res.status(500).json({ error: 'Erro ao salvar no banco de dados' });
+        console.error('Erro ao salvar:', err);
+        res.status(500).json({ error: 'Erro no servidor' });
     }
 });
 
