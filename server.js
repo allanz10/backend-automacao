@@ -170,6 +170,15 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+app.get('/api/accounts', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM social_accounts');
+        res.json(result.rows); // Envia a lista de contas para o site
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao buscar contas' });
+    }
+});
+
 // Checa a sessão ao atualizar a página
 app.get('/api/auth/me', async (req, res) => {
     try {
