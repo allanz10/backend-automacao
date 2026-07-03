@@ -106,7 +106,6 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 // Adicione esta rota ao seu server.js
-const axios = require('axios'); // Certifique-se de que esta linha está no topo
 
 app.post('/api/accounts', async (req, res) => {
     // Pegamos os dados do body conforme o seu frontend envia
